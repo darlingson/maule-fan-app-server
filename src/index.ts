@@ -2,7 +2,10 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { sql } from '../src/services/db.js';
 import { appAuth } from './middleware/AppAuth.js';
+import { playerRoutes } from './router/index.js'
 const app = new Hono()
+
+app.route('/api/players', playerRoutes);
 
 app.get('/', (c) => {
   return c.text('Hello Hono!')
