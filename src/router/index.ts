@@ -4,7 +4,7 @@ import type { Context } from 'hono';
 import { getPlayers, getPlayerById, searchPlayers } from '../controllers/playerController.js';
 import { getCompetitions, getCompetitionById, getCompetitionMatches,getCompetitionMatchesEvents } from '../controllers/competitionController.js';
 import { getMatches, getMatchById, getMatchEvents } from '../controllers/matchController.js';
-
+import { getTeams, getTeamById, getTeamPlayers, getTeamMatches, getTeamCompetitions } from '../controllers/teamsController.js';
 const playerRoutes = new Hono()
   .get('/', getPlayers)
   .get('/search', searchPlayers)
@@ -24,4 +24,12 @@ const matchRoutes = new Hono()
   .get('/:id/events', getMatchEvents)
   .post('/', (c: Context) => c.json({ result: 'create a match' }, 201));
 
-export { playerRoutes, competitionRoutes, matchRoutes };
+const teamRoutes = new Hono()
+  .get('/', getTeams)
+  .get('/:id', getTeamById)
+  .get('/:id/players', getTeamPlayers)
+  .get('/:id/matches', getTeamMatches)
+  .get('/:id/competitions', getTeamCompetitions)
+  .post('/', (c: Context) => c.json({ result: 'create a team' }, 201));
+
+export { playerRoutes, competitionRoutes, matchRoutes, teamRoutes };
