@@ -1,3 +1,5 @@
+//src/router/index.ts
+
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { getPlayers, getPlayerById, searchPlayers } from '../controllers/playerController.js';
