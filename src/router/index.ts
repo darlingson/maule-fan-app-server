@@ -2,7 +2,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { getPlayers, getPlayerById, searchPlayers } from '../controllers/playerController.js';
-import { getCompetitions, getCompetitionById, getCompetitionMatches } from '../controllers/competitionController.js';
+import { getCompetitions, getCompetitionById, getCompetitionMatches,getCompetitionMatchesEvents } from '../controllers/competitionController.js';
 import { getMatches, getMatchById, getMatchEvents } from '../controllers/matchController.js';
 
 const playerRoutes = new Hono()
@@ -15,6 +15,7 @@ const competitionRoutes = new Hono()
   .get('/', getCompetitions)
   .get('/:id', getCompetitionById)
   .get('/:id/matches', getCompetitionMatches)
+  .get('/:id/matches/events', getCompetitionMatchesEvents)
   .post('/', (c: Context) => c.json({ result: 'create a competition' }, 201));
 
 const matchRoutes = new Hono()
