@@ -1,7 +1,7 @@
 {
   "functions": {
-    "api/index.ts": {
-      "runtime": "@vercel/node@latest"
+    "api/**/*.ts": {
+      "runtime": "@vercel/node@3.0.20"
     }
   }
 }
