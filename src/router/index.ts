@@ -5,6 +5,8 @@ import { getPlayers, getPlayerById, searchPlayers } from '../controllers/playerC
 import { getCompetitions, getCompetitionById, getCompetitionMatches,getCompetitionMatchesEvents } from '../controllers/competitionController.js';
 import { getMatches, getMatchById, getMatchEvents } from '../controllers/matchController.js';
 import { getTeams, getTeamById, getTeamPlayers, getTeamMatches, getTeamCompetitions } from '../controllers/teamsController.js';
+import { getTeamHomepage } from '../controllers/teamHomepageController.js';
+
 const playerRoutes = new Hono()
   .get('/', getPlayers)
   .get('/search', searchPlayers)
@@ -30,6 +32,7 @@ const teamRoutes = new Hono()
   .get('/:id/players', getTeamPlayers)
   .get('/:id/matches', getTeamMatches)
   .get('/:id/competitions', getTeamCompetitions)
+  .get('/:id/homepage', getTeamHomepage)
   .post('/', (c: Context) => c.json({ result: 'create a team' }, 201));
 
 export { playerRoutes, competitionRoutes, matchRoutes, teamRoutes };
