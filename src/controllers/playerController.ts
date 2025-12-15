@@ -68,6 +68,17 @@ export const getPlayerById = async (c: Context) => {
     WHERE e.player_id = ${id}
   `;
 
+  const [history] = await sql`
+  SELECT
+    h.team_id   AS "teamId",
+    h.start_date AS "startDate",
+    h.end_date   AS "endDate",
+    t.name       AS "teamName"
+  FROM player_team_history h
+  JOIN teams t ON h.team_id = t.id
+  WHERE h.player_id = ${id}
+`;
+
   const events = await sql`
     SELECT
       e.event_type,
@@ -103,7 +114,7 @@ export const getPlayerById = async (c: Context) => {
   const byMatch: Record<number, { date: any; competitionId: number; homeTeamId: number; awayTeamId: number; homeTeamScore: number; awayTeamScore: number; matchVenue: string; events: any[] }> = {};
   for (const e of filteredEvents) {
     console.log(e.competitionId)
-    if (!byMatch[e.match_id]) byMatch[e.match_id] = { 
+    if (!byMatch[e.match_id]) byMatch[e.match_id] = {
       date: e.match_date,
       competitionId: e.competitionid,
       homeTeamId: e.awayteamid,
@@ -111,9 +122,9 @@ export const getPlayerById = async (c: Context) => {
       homeTeamScore: e.hometeamscore,
       awayTeamScore: e.awayteamscore,
       matchVenue: e.matchvenue,
-       events: []
-     };
-     console.log(byMatch)
+      events: []
+    };
+    console.log(byMatch)
     byMatch[e.match_id].events.push({
       type: e.event_type,
       minute: e.minute,
@@ -136,6 +147,7 @@ export const getPlayerById = async (c: Context) => {
 
   (player as any).last_matches = last_matches;
   (player as any).stats = stats;
+  (player as any).history = history;
 
 
   return c.json(player);
