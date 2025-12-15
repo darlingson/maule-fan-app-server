@@ -172,8 +172,30 @@ export const getTeamMatchesEvents = async (c: Context) => {
 
   // Get match IDs for events query
   const matchIds = matches.map(m => m.id);
+  
+  if (matchIds.length === 0) {
+    return c.json({ 
+      page, 
+      limit, 
+      data: matches.map(r => ({
+        id: r.id,
+        date: r.date,
+        venue: r.venue,
+        status: new Date(r.date) < now() ? 
+          (r.score_home === null && r.score_away === null ? 'LIVE' : 'FT') : 'UPCOMING',
+        score: { home: r.score_home, away: r.score_away },
+        competition: { name: r.comp_name, season: r.comp_season },
+        home_team: { short_name: r.home_short, logo_url: r.home_logo },
+        away_team: { short_name: r.away_short, logo_url: r.away_logo },
+        events: { goals: [], red_cards: [] }
+      }))
+    });
+  }
 
-  // Second query: get events for these matches
+  // Get events only for matches in our current pagination window
+  // We'll get a reasonable buffer to account for potential event density
+  const eventsBufferSize = Math.max(limit * 2, 20); // At least 20, but scale with page size
+  
   const events = await sql`
     SELECT me.match_id,
            me.event_type,
@@ -181,8 +203,14 @@ export const getTeamMatchesEvents = async (c: Context) => {
            me.minute,
            me.assisting_player_id
     FROM match_events me
-    WHERE me.match_id IN (${matchIds})
-      AND me.event_type IN ('goal', 'red_card')
+    WHERE me.match_id IN (
+      SELECT m.id 
+      FROM matches m 
+      WHERE (m.home_team_id = ${id} OR m.away_team_id = ${id})
+      ORDER BY m.date DESC
+      LIMIT ${eventsBufferSize} OFFSET ${offset}
+    )
+    AND me.event_type IN ('goal', 'red_card')
     ORDER BY me.minute ASC
   `;
 
@@ -205,6 +233,7 @@ export const getTeamMatchesEvents = async (c: Context) => {
 
   // Group events by match ID
   const eventsByMatch: EventsByMatch = {};
+  
   events.forEach(event => {
     if (!eventsByMatch[event.match_id]) {
       eventsByMatch[event.match_id] = { goals: [], red_cards: [] };
@@ -229,7 +258,7 @@ export const getTeamMatchesEvents = async (c: Context) => {
   const data = matches.map(r => {
     const isPast = new Date(r.date) < now();
     const status = !isPast ? 'UPCOMING' :
-      (r.score_home === null && r.score_away === null) ? 'LIVE' : 'FT';
+      (r.score_home === null && r.score_away === null ? 'LIVE' : 'FT');
 
     return {
       id: r.id,
