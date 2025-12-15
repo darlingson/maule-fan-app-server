@@ -5,14 +5,14 @@ import { sql } from '../services/db.js';
 const isoDateToDateStr = (d: string) => new Date(d).toISOString().slice(0, 10);
 const now = () => new Date();
 
- 
+
 /**
  * GET /api/teams
  * Get all teams with optional pagination
  * Query params: ?page=1&limit=20
  */
 export const getTeams = async (c: Context) => {
-  const page  = parseInt(c.req.query('page')  || '1',  10);
+  const page = parseInt(c.req.query('page') || '1', 10);
   const limit = parseInt(c.req.query('limit') || '20', 10);
   const offset = (page - 1) * limit;
 
@@ -46,9 +46,9 @@ export const getTeamById = async (c: Context) => {
  * Query params: ?page=1&limit=20
  */
 export const getTeamPlayers = async (c: Context) => {
-  const id   = c.req.param('id');
-  const page = parseInt(c.req.query('page')  || '1', 10);
-  const limit= parseInt(c.req.query('limit') || '20', 10);
+  const id = c.req.param('id');
+  const page = parseInt(c.req.query('page') || '1', 10);
+  const limit = parseInt(c.req.query('limit') || '20', 10);
   const offset = (page - 1) * limit;
 
   /* players whose last history row has this team and no end_date */
@@ -85,11 +85,11 @@ export const getTeamPlayers = async (c: Context) => {
  * Query params: ?page=1&limit=10&date=2025-12-13
  */
 export const getTeamMatches = async (c: Context) => {
-  const id    = c.req.param('id');
-  const page  = parseInt(c.req.query('page')  || '1',  10);
+  const id = c.req.param('id');
+  const page = parseInt(c.req.query('page') || '1', 10);
   const limit = parseInt(c.req.query('limit') || '10', 10);
-  const offset= (page - 1) * limit;
-  const date  = c.req.query('date');
+  const offset = (page - 1) * limit;
+  const date = c.req.query('date');
 
   const rows = await sql`
     SELECT m.id,
@@ -114,9 +114,9 @@ export const getTeamMatches = async (c: Context) => {
   `;
 
   const data = rows.map(r => {
-    const isPast  = new Date(r.date) < now();
-    const status  = !isPast ? 'UPCOMING' :
-                    (r.score_home === null && r.score_away === null) ? 'LIVE' : 'FT';
+    const isPast = new Date(r.date) < now();
+    const status = !isPast ? 'UPCOMING' :
+      (r.score_home === null && r.score_away === null) ? 'LIVE' : 'FT';
 
     return {
       id: r.id,
@@ -136,12 +136,125 @@ export const getTeamMatches = async (c: Context) => {
 };
 
 /**
+ * GET /api/teams/:id/matches/events
+ * Get match events for a team with goals and red cards
+ * Query params: ?page=1&limit=10&date=2025-12-13
+ */
+export const getTeamMatchesEvents = async (c: Context) => {
+  const id = c.req.param('id');
+  const page = parseInt(c.req.query('page') || '1', 10);
+  const limit = parseInt(c.req.query('limit') || '10', 10);
+  const offset = (page - 1) * limit;
+  const date = c.req.query('date');
+
+  // First query: get matches
+  const matches = await sql`
+    SELECT m.id,
+           m.date,
+           m.score_home,
+           m.score_away,
+           m.venue,
+           comp.name   AS comp_name,
+           comp.season AS comp_season,
+           ht.short_name AS home_short,
+           ht.logo_url   AS home_logo,
+           at.short_name AS away_short,
+           at.logo_url   AS away_logo
+    FROM matches m
+    JOIN competitions comp ON comp.id = m.competition_id
+    JOIN teams ht ON ht.id = m.home_team_id
+    JOIN teams at ON at.id = m.away_team_id
+    WHERE (m.home_team_id = ${id} OR m.away_team_id = ${id})
+      ${date ? sql`AND m.date::date = ${date}::date` : sql``}
+    ORDER BY m.date DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+
+  // Get match IDs for events query
+  const matchIds = matches.map(m => m.id);
+
+  // Second query: get events for these matches
+  const events = await sql`
+    SELECT me.match_id,
+           me.event_type,
+           me.player_id,
+           me.minute,
+           me.assisting_player_id
+    FROM match_events me
+    WHERE me.match_id IN (${matchIds})
+      AND me.event_type IN ('goal', 'red_card')
+    ORDER BY me.minute ASC
+  `;
+
+  // Define proper types
+  interface Event {
+    id: number;
+    player_id: number;
+    minute: number;
+    assisting_player_id?: number;
+  }
+
+  interface MatchEvents {
+    goals: Event[];
+    red_cards: Event[];
+  }
+
+  interface EventsByMatch {
+    [key: number]: MatchEvents;
+  }
+
+  // Group events by match ID
+  const eventsByMatch: EventsByMatch = {};
+  events.forEach(event => {
+    if (!eventsByMatch[event.match_id]) {
+      eventsByMatch[event.match_id] = { goals: [], red_cards: [] };
+    }
+
+    if (event.event_type === 'goal') {
+      eventsByMatch[event.match_id].goals.push({
+        id: event.id,
+        player_id: event.player_id,
+        minute: event.minute,
+        assisting_player_id: event.assisting_player_id
+      });
+    } else if (event.event_type === 'red_card') {
+      eventsByMatch[event.match_id].red_cards.push({
+        id: event.id,
+        player_id: event.player_id,
+        minute: event.minute
+      });
+    }
+  });
+
+  const data = matches.map(r => {
+    const isPast = new Date(r.date) < now();
+    const status = !isPast ? 'UPCOMING' :
+      (r.score_home === null && r.score_away === null) ? 'LIVE' : 'FT';
+
+    return {
+      id: r.id,
+      date: r.date,
+      venue: r.venue,
+      status,
+      score: { home: r.score_home, away: r.score_away },
+      competition: { name: r.comp_name, season: r.comp_season },
+      home_team: { short_name: r.home_short, logo_url: r.home_logo },
+      away_team: { short_name: r.away_short, logo_url: r.away_logo },
+      events: eventsByMatch[r.id] || { goals: [], red_cards: [] }
+    };
+  });
+
+  return c.json({ page, limit, data });
+};
+
+
+/**
  * GET /api/teams/:id/competitions
  * Get competitions that a team participates in
  * Query params: ?season=2025/26
  */
 export const getTeamCompetitions = async (c: Context) => {
-  const id     = c.req.param('id');
+  const id = c.req.param('id');
   const season = c.req.query('season');
 
   const rows = await sql`
