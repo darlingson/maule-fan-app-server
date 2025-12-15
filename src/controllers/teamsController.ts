@@ -138,7 +138,7 @@ export const getTeamMatches = async (c: Context) => {
 /**
  * GET /api/teams/:id/matches/events
  * Get match events for a team with goals and red cards
- * Query params: ?page=1&limit=10&date=2025-12-13
+ * Query params: ?page=1&limit=10&date=2025-12-13&season=2025&competition=Super League Malawi
  */
 export const getTeamMatchesEvents = async (c: Context) => {
   const id = c.req.param('id');
@@ -146,8 +146,10 @@ export const getTeamMatchesEvents = async (c: Context) => {
   const limit = parseInt(c.req.query('limit') || '10', 10);
   const offset = (page - 1) * limit;
   const date = c.req.query('date');
+  const season = c.req.query('season');
+  const competition = c.req.query('competition');
 
-  // First query: get matches
+  // First query: get matches with filtering
   const matches = await sql`
     SELECT m.id,
            m.date,
@@ -166,6 +168,8 @@ export const getTeamMatchesEvents = async (c: Context) => {
     JOIN teams at ON at.id = m.away_team_id
     WHERE (m.home_team_id = ${id} OR m.away_team_id = ${id})
       ${date ? sql`AND m.date::date = ${date}::date` : sql``}
+      ${season ? sql`AND comp.season = ${season}` : sql``}
+      ${competition ? sql`AND comp.name = ${competition}` : sql``}
     ORDER BY m.date DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
@@ -193,8 +197,7 @@ export const getTeamMatchesEvents = async (c: Context) => {
   }
 
   // Get events only for matches in our current pagination window
-  // We'll get a reasonable buffer to account for potential event density
-  const eventsBufferSize = Math.max(limit * 2, 20); // At least 20, but scale with page size
+  const eventsBufferSize = Math.max(limit * 2, 20);
   
   const events = await sql`
     SELECT me.match_id,
@@ -206,7 +209,10 @@ export const getTeamMatchesEvents = async (c: Context) => {
     WHERE me.match_id IN (
       SELECT m.id 
       FROM matches m 
+      JOIN competitions comp ON comp.id = m.competition_id
       WHERE (m.home_team_id = ${id} OR m.away_team_id = ${id})
+        ${season ? sql`AND comp.season = ${season}` : sql``}
+        ${competition ? sql`AND comp.name = ${competition}` : sql``}
       ORDER BY m.date DESC
       LIMIT ${eventsBufferSize} OFFSET ${offset}
     )
@@ -214,25 +220,8 @@ export const getTeamMatchesEvents = async (c: Context) => {
     ORDER BY me.minute ASC
   `;
 
-  // Define proper types
-  interface Event {
-    id: number;
-    player_id: number;
-    minute: number;
-    assisting_player_id?: number;
-  }
-
-  interface MatchEvents {
-    goals: Event[];
-    red_cards: Event[];
-  }
-
-  interface EventsByMatch {
-    [key: number]: MatchEvents;
-  }
-
   // Group events by match ID
-  const eventsByMatch: EventsByMatch = {};
+  const eventsByMatch: {[key: number]: {goals: any[], red_cards: any[]}} = {};
   
   events.forEach(event => {
     if (!eventsByMatch[event.match_id]) {
