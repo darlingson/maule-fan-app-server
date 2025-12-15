@@ -300,3 +300,26 @@ export const getTeamCompetitions = async (c: Context) => {
   `;
   return c.json({ data: rows });
 };
+
+/**
+ * GET /api/teams/competitions-and-seasons
+ * Get competitions grouped by season for dropdown filters
+ */
+export const getSeasonsAndCompetitions = async (c: Context) => {
+  const data = await sql`
+    SELECT DISTINCT season, name
+    FROM competitions
+    ORDER BY season DESC, name ASC
+  ` as { season: string; name: string }[];
+
+  // Group competitions by season
+  const grouped: Record<string, string[]> = {};
+  data.forEach(row => {
+    if (!grouped[row.season]) {
+      grouped[row.season] = [];
+    }
+    grouped[row.season].push(row.name);
+  });
+
+  return c.json(grouped);
+};

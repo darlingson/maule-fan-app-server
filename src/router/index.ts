@@ -4,7 +4,7 @@ import type { Context } from 'hono';
 import { getPlayers, getPlayerById, searchPlayers } from '../controllers/playerController.js';
 import { getCompetitions, getCompetitionById, getCompetitionMatches,getCompetitionMatchesEvents } from '../controllers/competitionController.js';
 import { getMatches, getMatchById, getMatchEvents } from '../controllers/matchController.js';
-import { getTeams, getTeamById, getTeamPlayers, getTeamMatches, getTeamCompetitions, getTeamMatchesEvents } from '../controllers/teamsController.js';
+import { getTeams, getTeamById, getTeamPlayers, getTeamMatches, getTeamCompetitions, getTeamMatchesEvents, getSeasonsAndCompetitions } from '../controllers/teamsController.js';
 import { getTeamHomepage } from '../controllers/teamHomepageController.js';
 
 const playerRoutes = new Hono()
@@ -28,6 +28,7 @@ const matchRoutes = new Hono()
 
 const teamRoutes = new Hono()
   .get('/', getTeams)
+  .get('/competitions-and-seasons', getSeasonsAndCompetitions)
   .get('/:id', getTeamById)
   .get('/:id/players', getTeamPlayers)
   .get('/:id/matches', getTeamMatches)
