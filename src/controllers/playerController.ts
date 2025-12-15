@@ -52,6 +52,13 @@ export const getPlayers = async (c: Context) => {
 export const getPlayerById = async (c: Context) => {
   const id = c.req.param('id');
 
+  const teams = await sql`
+    SELECT t.id, t.name
+    FROM teams t
+  `;
+  const teamsMap: Map<number, string> = new Map(teams.map((t: any) => [t.id, t.name]));
+
+
   const [player] = await sql`
     SELECT p.id, p.name, p.date_of_birth, p.nationality, p.photo_url, p.position
     FROM players p
@@ -95,6 +102,8 @@ export const getPlayerById = async (c: Context) => {
       m.venue as matchVenue
     FROM match_events e
     JOIN matches m ON e.match_id = m.id
+    JOIN competitions c ON m.competition_id = c.id
+    JOIN teams t ON m.home_team_id = t.id OR m.away_team_id = t.id
     WHERE e.player_id = ${id} OR e.assisting_player_id = ${id}
     ORDER BY m.date DESC, e.minute
   `;
@@ -111,7 +120,18 @@ export const getPlayerById = async (c: Context) => {
 
   console.log(filteredEvents)
 
-  const byMatch: Record<number, { date: any; competitionId: number; homeTeamId: number; awayTeamId: number; homeTeamScore: number; awayTeamScore: number; matchVenue: string; events: any[] }> = {};
+  const byMatch: Record<number, {
+    date: any;
+    competitionId: number;
+    homeTeamName: string;
+    awayTeamName: string;
+    homeTeamId: number;
+    awayTeamId: number;
+    homeTeamScore: number;
+    awayTeamScore: number;
+    matchVenue: string;
+    events: any[]
+  }> = {};
   for (const e of filteredEvents) {
     console.log(e.competitionId)
     if (!byMatch[e.match_id]) byMatch[e.match_id] = {
@@ -119,6 +139,8 @@ export const getPlayerById = async (c: Context) => {
       competitionId: e.competitionid,
       homeTeamId: e.awayteamid,
       awayTeamId: e.awayteamid,
+      awayTeamName: teamsMap.get(e.awayteamid) || "",
+      homeTeamName: teamsMap.get(e.hometeamid) || "",
       homeTeamScore: e.hometeamscore,
       awayTeamScore: e.awayteamscore,
       matchVenue: e.matchvenue,
@@ -136,18 +158,20 @@ export const getPlayerById = async (c: Context) => {
   const last_matches = lastFiveMatchIds.map(mid => ({
     id: mid,
     date: byMatch[mid]?.date,
-    events: byMatch[mid]?.events || [],
     competitionId: byMatch[mid]?.competitionId,
     homeTeamId: byMatch[mid]?.homeTeamId,
     awayTeamId: byMatch[mid]?.awayTeamId,
     homeTeamScore: byMatch[mid]?.homeTeamScore,
     awayTeamScore: byMatch[mid]?.awayTeamScore,
     matchVenue: byMatch[mid]?.matchVenue,
+    homeTeamName: byMatch[mid]?.homeTeamName,
+    awayTeamName: byMatch[mid]?.awayTeamName,
+    events: byMatch[mid]?.events || [],
   }));
 
-  (player as any).last_matches = last_matches;
   (player as any).stats = stats;
   (player as any).history = history;
+  (player as any).last_matches = last_matches;
 
 
   return c.json(player);
