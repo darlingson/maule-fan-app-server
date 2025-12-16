@@ -73,12 +73,42 @@ export const getTeamHomepage = async (c: Context) => {
 
   /* 3.  Competitions the team is part of this season */
   const competitions = await sql`
-    SELECT DISTINCT c.id, c.name, c.type, c.season
-    FROM matches m
-    JOIN competitions c ON c.id = m.competition_id
-    WHERE (m.home_team_id = ${teamId} OR m.away_team_id = ${teamId})
-      AND c.season = '2025/26'
-    ORDER BY c.name`;
+    WITH comp AS (
+      SELECT DISTINCT c.id, c.name, c.type, c.season
+      FROM matches m
+      JOIN competitions c ON c.id = m.competition_id
+      WHERE (m.home_team_id = ${teamId} OR m.away_team_id = ${teamId})
+    ),
+    normalized AS (
+      SELECT
+        comp.*,
+        CASE
+          WHEN substring(comp.season from '(\\d{4})') IS NOT NULL
+            THEN (substring(comp.season from '(\\d{4})'))::int
+          WHEN substring(comp.season from '(\\d{2})') IS NOT NULL
+            THEN 2000 + (substring(comp.season from '(\\d{2})'))::int
+          ELSE NULL
+        END AS start_year,
+        CASE
+          WHEN substring(comp.season from '.*(\\d{4}).*$') IS NOT NULL
+            THEN (substring(comp.season from '.*(\\d{4}).*$'))::int
+          WHEN substring(comp.season from '.*(\\d{2})$') IS NOT NULL
+            THEN ((COALESCE(
+                     (substring(comp.season from '(\\d{4})'))::int,
+                     2000 + (substring(comp.season from '(\\d{2})'))::int
+                   ) / 100) * 100) + (substring(comp.season from '.*(\\d{2})$'))::int
+          ELSE NULL
+        END AS end_year
+      FROM comp
+    ),
+    latest AS (
+      SELECT max(COALESCE(end_year, start_year)) AS latest_end
+      FROM normalized
+    )
+    SELECT n.id, n.name, n.type, n.season
+    FROM normalized n, latest l
+    WHERE COALESCE(n.end_year, n.start_year) = l.latest_end
+    ORDER BY n.name`;
 
   return c.json({
     latest: latestMatch
