@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { getPlayers, getPlayerById, searchPlayers } from '../controllers/playerController.js';
 import { getCompetitions, getCompetitionById, getCompetitionMatches,getCompetitionMatchesEvents } from '../controllers/competitionController.js';
-import { getMatches, getMatchById, getMatchEvents } from '../controllers/matchController.js';
+import { getMatches, getMatchById, getMatchEvents, getMatchDetails } from '../controllers/matchController.js';
 import { getTeams, getTeamById, getTeamPlayers, getTeamMatches, getTeamCompetitions, getTeamMatchesEvents, getSeasonsAndCompetitions } from '../controllers/teamsController.js';
 import { getTeamHomepage } from '../controllers/teamHomepageController.js';
 
@@ -23,6 +23,7 @@ const competitionRoutes = new Hono()
 const matchRoutes = new Hono()
   .get('/', getMatches)
   .get('/:id', getMatchById)
+  .get('/:id/details', getMatchDetails)
   .get('/:id/events', getMatchEvents)
   .post('/', (c: Context) => c.json({ result: 'create a match' }, 201));
 
