@@ -35,6 +35,7 @@ open http://localhost:3000
 #### players
 - id (PK)
 - name
+- short_name
 - date_of_birth
 - nationality
 - photo_url

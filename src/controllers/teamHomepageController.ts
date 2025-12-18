@@ -12,7 +12,6 @@ interface MatchEvent {
 export const getTeamHomepage = async (c: Context) => {
   const teamId = c.req.param('id');
 
-  /* 1.  Latest finished match involving this team */
   const [latestMatch] = await sql`
     SELECT m.id,
            m.date,
@@ -27,7 +26,7 @@ export const getTeamHomepage = async (c: Context) => {
     JOIN teams ht ON ht.id = m.home_team_id
     JOIN teams at ON at.id = m.away_team_id
     WHERE (m.home_team_id = ${teamId} OR m.away_team_id = ${teamId})
-      AND m.score_home IS NOT NULL          -- considered “finished”
+      AND m.score_home IS NOT NULL
     ORDER BY m.date DESC
     LIMIT 1`;
 
@@ -46,8 +45,7 @@ export const getTeamHomepage = async (c: Context) => {
       ORDER BY e.minute`;
   }
 
-  /* 2.  Next upcoming match */
-  const [nextMatch] = await sql`
+  const upcomingMatches = await sql`
     SELECT m.id,
            m.date,
            m.venue,
@@ -59,19 +57,32 @@ export const getTeamHomepage = async (c: Context) => {
     JOIN teams ht ON ht.id = m.home_team_id
     JOIN teams at ON at.id = m.away_team_id
     WHERE (m.home_team_id = ${teamId} OR m.away_team_id = ${teamId})
-      AND m.score_home IS NULL
-    ORDER BY m.date ASC
-    LIMIT 1`;
+      AND m.date >= CURRENT_DATE
+    ORDER BY m.date ASC`;
+  const nextMatch = upcomingMatches[0] ?? null;
 
-  let kickoffIn = null;
+  let kickoffIn: string | null = null;
+
   if (nextMatch) {
-    const diff = new Date(nextMatch.date).getTime() - Date.now();
-    const days = Math.floor(diff / 86_400_000);
-    const hours = Math.floor((diff % 86_400_000) / 3_600_000);
-    kickoffIn = `${days}d ${hours}h`;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const matchDate = new Date(nextMatch.date);
+    matchDate.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.round(
+      (matchDate.getTime() - today.getTime()) / 86_400_000
+    );
+
+    if (diffDays === 0) {
+      kickoffIn = 'Today';
+    } else if (diffDays === 1) {
+      kickoffIn = 'Tomorrow';
+    } else {
+      kickoffIn = `${diffDays} days`;
+    }
   }
 
-  /* 3.  Competitions the team is part of this season */
   const competitions = await sql`
     WITH comp AS (
       SELECT DISTINCT c.id, c.name, c.type, c.season
